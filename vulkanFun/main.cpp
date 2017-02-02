@@ -1,10 +1,15 @@
+#define NOMINMAX
+
 #include <vulkan/vulkan.hpp>
 #include <Windows.h>
 #include <GLFW/glfw3.h>
 
-#include <set>
 
-#define TRACE(v, ...) { char buff[512]; sprintf_s(buff, sizeof(buff), "[TRACE] " v "\n", __VA_ARGS__); printf(buff); OutputDebugString(buff); }
+#include <set>
+#include <limits>
+#include <algorithm>
+
+#define TRACE(v, ...) { char buff[1024]; sprintf_s(buff, sizeof(buff), "[TRACE] " v "\n", __VA_ARGS__); printf(buff); OutputDebugString(buff); }
 
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 
@@ -22,13 +27,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 };
 
+unsigned _min(unsigned a, unsigned b) { return a < b ? a : b; };
+unsigned _max(unsigned a, unsigned b) { return a > b ? a : b; };
+
 int main()
 {
     glfwInit();
 
+    const unsigned WIDTH = 640;
+    const unsigned HEIGHT = 480;
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    GLFWwindow* window = glfwCreateWindow(640, 480, "vkTest", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "vkTest", nullptr, nullptr);
 
     // print available instance extensions and layers
     auto allInstExtensions = vk::enumerateInstanceExtensionProperties();
@@ -214,7 +225,7 @@ int main()
         gfxQueue :
         dev.getQueue(present_queue_ix, 0);
 
-    //auto surfaceCaps = physDevice.getSurfaceCapabilitiesKHR(surface);
+    auto surfaceCaps = physDevice.getSurfaceCapabilitiesKHR(surface);
     auto surfaceFormats = physDevice.getSurfaceFormatsKHR(surface);
     auto surfacePresentModes = physDevice.getSurfacePresentModesKHR(surface);
 
@@ -252,11 +263,68 @@ int main()
         }
     }
 
+    // calculate swap extent
+    vk::Extent2D swapExtent;
+    if (surfaceCaps.currentExtent.width != UINT32_MAX)
+    {
+        swapExtent = surfaceCaps.currentExtent;
+    }
+    else
+    {
+        swapExtent.width = WIDTH;
+        swapExtent.height = HEIGHT;
+        
+        swapExtent.width = std::max(surfaceCaps.minImageExtent.width, std::min(surfaceCaps.maxImageExtent.width, swapExtent.width));
+        swapExtent.height = std::max(surfaceCaps.minImageExtent.height, std::min(surfaceCaps.maxImageExtent.height, swapExtent.height));
+    }
+    
+    uint32_t imageCount = surfaceCaps.minImageCount + 1;
+    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount) {
+        imageCount = surfaceCaps.maxImageCount;
+    }
+
+    // time to create the swapchain, first setup the details struct
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo;
+    swapchainCreateInfo.surface = surface;
+    swapchainCreateInfo.minImageCount = imageCount;
+    swapchainCreateInfo.imageFormat = selectedSurfaceFormat.format;
+    swapchainCreateInfo.imageColorSpace = selectedSurfaceFormat.colorSpace;
+    swapchainCreateInfo.imageExtent = swapExtent;
+    swapchainCreateInfo.imageArrayLayers = 1;
+    swapchainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+
+    uint32_t queueFamilyIxs[] = { (uint32_t)graphics_queue_ix, (uint32_t)present_queue_ix };
+    if (graphics_queue_ix != present_queue_ix)
+    {
+        swapchainCreateInfo.imageSharingMode = vk::SharingMode::eConcurrent;
+        swapchainCreateInfo.queueFamilyIndexCount = 2;
+        swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIxs;
+    }
+    else
+    {
+        swapchainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
+        swapchainCreateInfo.queueFamilyIndexCount = 0;
+        swapchainCreateInfo.pQueueFamilyIndices = 0;
+    }
+
+    swapchainCreateInfo.preTransform = surfaceCaps.currentTransform;
+    swapchainCreateInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+    swapchainCreateInfo.presentMode = selectedPresentMode;
+    swapchainCreateInfo.clipped = VK_TRUE;
+
+    // now create the swapchain!
+    auto swapChain = dev.createSwapchainKHR(swapchainCreateInfo);
+
+    //
+
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
 
     // shutdown
     dev.waitIdle();
+
+    dev.destroySwapchainKHR(swapChain);
+
     inst.destroySurfaceKHR(surface);
     glfwDestroyWindow(window);
 
