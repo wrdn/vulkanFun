@@ -314,8 +314,7 @@ int main()
 
     // now create the swapchain!
     auto swapChain = dev.createSwapchainKHR(swapchainCreateInfo);
-
-    //
+    auto swapChainImages = dev.getSwapchainImagesKHR(swapChain);
 
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
