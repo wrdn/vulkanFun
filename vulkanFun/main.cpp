@@ -1,17 +1,19 @@
 #define NOMINMAX
 
+#include "trace.h"
+#include "file_helpers.h"
+
 #include <vulkan/vulkan.hpp>
-#include <Windows.h>
 #include <GLFW/glfw3.h>
 #include <set>
 #include <limits>
 #include <algorithm>
-#include <fstream>
 #include <chrono>
 
-#define TRACE(v, ...) { char buff[1024]; sprintf_s(buff, sizeof(buff), "[TRACE] " v "\n", __VA_ARGS__); printf(buff); OutputDebugString(buff); }
-
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+
+static bool ADD_VALIDATION_LAYERS = true;
+static const char* STANDARD_VALIDATION_LAYER_NAME = "VK_LAYER_LUNARG_standard_validation";
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugReportFlagsEXT flags,
@@ -27,31 +29,189 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 };
 
-std::vector<char> readFile(const std::string& fName) {
-    std::ifstream file(fName, std::ios::ate | std::ios::binary);
+class VKRenderer
+{
+public:
+    void                       createInstance();
+    void                       setupDebugCallback();
+    void                       createSurface(GLFWwindow* window);
+    void                       selectPhysicalDevice();
+    void                       selectLogicalDevice();
 
-    if (!file.is_open())
-        return std::vector<char>();
+private:
+    vk::Instance               m_inst;
+    vk::SurfaceKHR             m_surface;
+    vk::PhysicalDevice         m_physDevice;
+    vk::Device                 m_dev;
 
-    size_t fSize = (size_t)file.tellg();
-    std::vector<char> buff(fSize);
-
-    file.seekg(0);
-    file.read(buff.data(), buff.size());
-    file.close();
-
-    return buff;
+    VkDebugReportCallbackEXT   m_debugCallback;
+    std::vector<const char*>   m_validationLayers;
 };
 
-void writeFile(const std::string& fName, const std::vector<unsigned char>& data)
+void VKRenderer::createInstance()
 {
-    std::ofstream file(fName, std::ios::binary);
-    if (!file.is_open())
+    auto allInstLayers = vk::enumerateInstanceLayerProperties();
+    auto allInstExtensions = vk::enumerateInstanceExtensionProperties();
+
+    m_validationLayers.clear();
+
+    // Add VK_LAYER_LUNARG_standard_validation if it exists in extension list
+    // and validation layers are turned on
+    std::vector<const char*> instLayers;
+    if (ADD_VALIDATION_LAYERS)
+    {
+        auto validationLayer = std::find_if(allInstLayers.begin(), allInstLayers.end(), [](const vk::LayerProperties& e) {
+            return strcmp(e.layerName, STANDARD_VALIDATION_LAYER_NAME) == 0;
+        });
+
+        if (validationLayer != allInstLayers.end())
+        {
+            instLayers.push_back(validationLayer->layerName);
+            m_validationLayers.push_back(validationLayer->layerName);
+        }
+    }
+
+    // Populate required extensions vector then find and add debug report extension
+    uint32_t reqExtCount = 0;
+    const char** reqExt = glfwGetRequiredInstanceExtensions(&reqExtCount);
+    std::vector<const char*> instExtensions;
+    for (uint32_t i = 0; i < reqExtCount; ++i)
+        instExtensions.push_back(reqExt[i]);
+
+    // find debug report extension
+    if (ADD_VALIDATION_LAYERS)
+    {
+        auto debugReportExtension = std::find_if(allInstExtensions.begin(), allInstExtensions.end(), [](const vk::ExtensionProperties& e) {
+            return strcmp(e.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0;
+        });
+
+        if (debugReportExtension != allInstExtensions.end())
+            instExtensions.push_back(debugReportExtension->extensionName);
+    }
+
+    // setup instance creation info
+    vk::ApplicationInfo appInfo("vkTest", 1, "vkTest", 1, VK_API_VERSION_1_0);
+    vk::InstanceCreateInfo instCreateInfo(vk::InstanceCreateFlags(), &appInfo);
+    instCreateInfo.enabledExtensionCount = (uint32_t)instExtensions.size();
+    instCreateInfo.ppEnabledExtensionNames = instExtensions.data();
+    if (instLayers.empty() == false) {
+        instCreateInfo.ppEnabledLayerNames = instLayers.data();
+        instCreateInfo.enabledLayerCount = (uint32_t)instLayers.size();
+    }
+
+    // create instance
+    m_inst = vk::createInstance(instCreateInfo);
+}
+
+void VKRenderer::setupDebugCallback()
+{
+    vk::DebugReportCallbackCreateInfoEXT debugReportCallbackInfo;
+    debugReportCallbackInfo.flags =
+        vk::DebugReportFlagBitsEXT::eInformation |
+        vk::DebugReportFlagBitsEXT::eWarning |
+        vk::DebugReportFlagBitsEXT::ePerformanceWarning |
+        vk::DebugReportFlagBitsEXT::eError |
+        vk::DebugReportFlagBitsEXT::eDebug;
+
+    debugReportCallbackInfo.pfnCallback = debugCallback;
+
+    auto createDebugReportFunc = (PFN_vkCreateDebugReportCallbackEXT)m_inst.getProcAddr("vkCreateDebugReportCallbackEXT");
+
+    auto debugReportCallbackRes = createDebugReportFunc(VkInstance(m_inst), &VkDebugReportCallbackCreateInfoEXT(debugReportCallbackInfo), nullptr, &m_debugCallback);
+}
+
+void VKRenderer::createSurface(GLFWwindow* window)
+{
+    glfwCreateWindowSurface(VkInstance(m_inst), window, nullptr, (VkSurfaceKHR*)&m_surface);
+}
+
+void VKRenderer::selectPhysicalDevice()
+{
+    // enumerate devices, print details and select best one (for now, just select the first entry)
+    auto physDevices = m_inst.enumeratePhysicalDevices();
+    
+    for (auto it : physDevices)
+        TRACE("Device: %s", it.getProperties().deviceName);
+
+    m_physDevice = physDevices[0];
+}
+
+void VKRenderer::selectLogicalDevice()
+{
+    // find graphics + present queues
+    auto queueFamilies = m_physDevice.getQueueFamilyProperties();
+    int graphics_queue_ix = -1;
+    int present_queue_ix = -1;
+
+    for (int i = 0; i < (int)queueFamilies.size(); ++i)
+    {
+        auto presentSupport = m_physDevice.getSurfaceSupportKHR(i, m_surface);
+        if (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics)
+        {
+            if (graphics_queue_ix == -1)
+                graphics_queue_ix = i;
+
+            if (presentSupport)
+            {
+                graphics_queue_ix = i;
+                present_queue_ix = i;
+                break;
+            }
+        }
+        else if (present_queue_ix == -1 && presentSupport)
+        {
+            present_queue_ix = i;
+        }
+    }
+
+    if (graphics_queue_ix == -1 || present_queue_ix == -1)
         return;
 
-    file.write((const char*)data.data(), data.size());
+    // make sure VK_KHR_SWAPCHAIN_EXTENSION_NAME is supported
+    auto allPhysDeviceExtensions = m_physDevice.enumerateDeviceExtensionProperties();
+    auto swapchainExt = std::find_if(allPhysDeviceExtensions.begin(), allPhysDeviceExtensions.end(), [](vk::ExtensionProperties& e) {
+        return strcmp(e.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
+    });
 
-    file.close();
+    if (swapchainExt == allPhysDeviceExtensions.end())
+        return;
+    
+    // setup queue info for graphics + presentation queues, which might be different
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+    std::set<int> uniqueQueueFamilies = { graphics_queue_ix, present_queue_ix };
+
+    float qPriority = 1.0f;
+    for (auto it : uniqueQueueFamilies)
+    {
+        vk::DeviceQueueCreateInfo queueCreateInfo;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.queueFamilyIndex = it;
+        queueCreateInfo.pQueuePriorities = &qPriority;
+
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
+    vk::DeviceCreateInfo deviceCreateInfo;
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
+
+    vk::PhysicalDeviceFeatures physDeviceFeatures;
+    deviceCreateInfo.pEnabledFeatures = &physDeviceFeatures;
+
+    // enable the swapchain extension (searched for above)
+    const char* swapchainExtId[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    deviceCreateInfo.enabledExtensionCount = 1;
+    deviceCreateInfo.ppEnabledExtensionNames = swapchainExtId;
+
+    // and validation layers
+    if (ADD_VALIDATION_LAYERS)
+    {
+        deviceCreateInfo.enabledLayerCount = (uint32_t)m_validationLayers.size();
+        deviceCreateInfo.ppEnabledLayerNames = m_validationLayers.data();
+    }
+
+    // create the logical device now!
+    m_dev = m_physDevice.createDevice(deviceCreateInfo);
 }
 
 int main()
@@ -64,6 +224,13 @@ int main()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "vkTest", nullptr, nullptr);
+
+    VKRenderer r;
+    r.createInstance();
+    r.setupDebugCallback();
+    r.createSurface(window);
+    r.selectPhysicalDevice();
+    r.selectLogicalDevice();
 
     // print available instance extensions and layers
     auto allInstExtensions = vk::enumerateInstanceExtensionProperties();
@@ -364,8 +531,8 @@ int main()
     }
 
     // load shaders
-    auto vertShaderSrc = readFile("shaders/vert.spv");
-    auto fragShaderSrc = readFile("shaders/frag.spv");
+    auto vertShaderSrc = file_helpers::readFile("shaders/vert.spv");
+    auto fragShaderSrc = file_helpers::readFile("shaders/frag.spv");
 
     std::vector<std::vector<char>> shaders = { vertShaderSrc, fragShaderSrc };
     std::vector<vk::ShaderModule> shaderModules;
@@ -532,7 +699,7 @@ int main()
     {
         vk::PipelineCacheCreateInfo cacheCreateInfo;
 
-        auto pipelineCacheStoredData = readFile("pipeline_cache/cache.bin");
+        auto pipelineCacheStoredData = file_helpers::readFile("pipeline_cache/cache.bin");
         if (pipelineCacheStoredData.empty() == false)
         {
             cacheCreateInfo.initialDataSize = pipelineCacheStoredData.size();
@@ -554,7 +721,7 @@ int main()
     if (PIPELINE_CACHE_ENABLED)
     {
         auto pipelineCacheData = dev.getPipelineCacheData(pipelineCache);
-        writeFile("pipeline_cache/cache.bin", pipelineCacheData);
+        file_helpers::writeFile("pipeline_cache/cache.bin", pipelineCacheData);
     }
 
     while (!glfwWindowShouldClose(window))
