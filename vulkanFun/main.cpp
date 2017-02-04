@@ -7,6 +7,7 @@
 #include <limits>
 #include <algorithm>
 #include <fstream>
+#include <chrono>
 
 #define TRACE(v, ...) { char buff[1024]; sprintf_s(buff, sizeof(buff), "[TRACE] " v "\n", __VA_ARGS__); printf(buff); OutputDebugString(buff); }
 
@@ -41,6 +42,17 @@ std::vector<char> readFile(const std::string& fName) {
 
     return buff;
 };
+
+void writeFile(const std::string& fName, const std::vector<unsigned char>& data)
+{
+    std::ofstream file(fName, std::ios::binary);
+    if (!file.is_open())
+        return;
+
+    file.write((const char*)data.data(), data.size());
+
+    file.close();
+}
 
 int main()
 {
@@ -513,7 +525,37 @@ int main()
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
 
-    auto gfxPipeline = dev.createGraphicsPipeline(vk::PipelineCache(), pipelineInfo);
+    // create pipeline cache (empty for the time being)
+    bool PIPELINE_CACHE_ENABLED = true;
+    vk::PipelineCache pipelineCache;
+    if (PIPELINE_CACHE_ENABLED)
+    {
+        vk::PipelineCacheCreateInfo cacheCreateInfo;
+
+        auto pipelineCacheStoredData = readFile("pipeline_cache/cache.bin");
+        if (pipelineCacheStoredData.empty() == false)
+        {
+            cacheCreateInfo.initialDataSize = pipelineCacheStoredData.size();
+            cacheCreateInfo.pInitialData = (const void*)pipelineCacheStoredData.data();
+        }
+
+        pipelineCache = dev.createPipelineCache(cacheCreateInfo);
+    }
+    
+    
+    auto pipelineCreateBegin = std::chrono::high_resolution_clock::now();
+
+    // create gfx pipeline
+    auto gfxPipeline = dev.createGraphicsPipeline(pipelineCache, pipelineInfo);
+
+    auto pipelineCreateEnd = std::chrono::high_resolution_clock::now();
+    TRACE("gfx pipeline creation took: %lld ms", std::chrono::duration_cast<std::chrono::milliseconds>(pipelineCreateEnd - pipelineCreateBegin).count());
+
+    if (PIPELINE_CACHE_ENABLED)
+    {
+        auto pipelineCacheData = dev.getPipelineCacheData(pipelineCache);
+        writeFile("pipeline_cache/cache.bin", pipelineCacheData);
+    }
 
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
@@ -522,6 +564,7 @@ int main()
     dev.waitIdle();
 
     dev.destroyPipeline(gfxPipeline);
+    dev.destroyPipelineCache(pipelineCache);
 
     dev.destroyRenderPass(renderPass);
 
