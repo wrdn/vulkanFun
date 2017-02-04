@@ -3,11 +3,10 @@
 #include <vulkan/vulkan.hpp>
 #include <Windows.h>
 #include <GLFW/glfw3.h>
-
-
 #include <set>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 #define TRACE(v, ...) { char buff[1024]; sprintf_s(buff, sizeof(buff), "[TRACE] " v "\n", __VA_ARGS__); printf(buff); OutputDebugString(buff); }
 
@@ -27,8 +26,21 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 };
 
-unsigned _min(unsigned a, unsigned b) { return a < b ? a : b; };
-unsigned _max(unsigned a, unsigned b) { return a > b ? a : b; };
+std::vector<char> readFile(const std::string& fName) {
+    std::ifstream file(fName, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open())
+        return std::vector<char>();
+
+    size_t fSize = (size_t)file.tellg();
+    std::vector<char> buff(fSize);
+
+    file.seekg(0);
+    file.read(buff.data(), buff.size());
+    file.close();
+
+    return buff;
+};
 
 int main()
 {
@@ -204,7 +216,7 @@ int main()
     deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
     deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     deviceCreateInfo.pEnabledFeatures = &physDeviceFeatures;
-    
+
     // enable the swapchain extension (searched for above)
     const char* swapchainExtId[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     deviceCreateInfo.enabledExtensionCount = 1;
@@ -273,11 +285,11 @@ int main()
     {
         swapExtent.width = WIDTH;
         swapExtent.height = HEIGHT;
-        
+
         swapExtent.width = std::max(surfaceCaps.minImageExtent.width, std::min(surfaceCaps.maxImageExtent.width, swapExtent.width));
         swapExtent.height = std::max(surfaceCaps.minImageExtent.height, std::min(surfaceCaps.maxImageExtent.height, swapExtent.height));
     }
-    
+
     uint32_t imageCount = surfaceCaps.minImageCount + 1;
     if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount) {
         imageCount = surfaceCaps.maxImageCount;
@@ -316,11 +328,74 @@ int main()
     auto swapChain = dev.createSwapchainKHR(swapchainCreateInfo);
     auto swapChainImages = dev.getSwapchainImagesKHR(swapChain);
 
+    // create image views so we can work with the swapchain images
+    std::vector<vk::ImageView> swapChainImageViews;
+    for (auto it : swapChainImages)
+    {
+        vk::ImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.image = it;
+        imageViewCreateInfo.format = swapchainCreateInfo.imageFormat;
+
+        imageViewCreateInfo.components.r = vk::ComponentSwizzle::eIdentity;
+        imageViewCreateInfo.components.g = vk::ComponentSwizzle::eIdentity;
+        imageViewCreateInfo.components.b = vk::ComponentSwizzle::eIdentity;
+        imageViewCreateInfo.components.a = vk::ComponentSwizzle::eIdentity;
+
+        imageViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        imageViewCreateInfo.subresourceRange.levelCount = 1;
+        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+        auto imgView = dev.createImageView(imageViewCreateInfo);
+        swapChainImageViews.push_back(imgView);
+    }
+
+    // load shaders
+    auto vertShaderSrc = readFile("shaders/vert.spv");
+    auto fragShaderSrc = readFile("shaders/frag.spv");
+
+    std::vector<std::vector<char>> shaders = { vertShaderSrc, fragShaderSrc };
+    std::vector<vk::ShaderModule> shaderModules;
+    for (auto it : shaders)
+    {
+        vk::ShaderModuleCreateInfo shaderCreateInfo;
+        shaderCreateInfo.codeSize = it.size();
+        shaderCreateInfo.pCode = (uint32_t*)it.data();
+
+        auto sm = dev.createShaderModule(shaderCreateInfo);
+        shaderModules.push_back(sm);
+    }
+
+    std::vector<vk::ShaderStageFlagBits> shaderStages = {
+        vk::ShaderStageFlagBits::eVertex ,
+        vk::ShaderStageFlagBits::eFragment
+    };
+
+    std::vector<vk::PipelineShaderStageCreateInfo> shaderPipelineCreateInfo;
+    for (size_t i = 0; i < shaderModules.size(); ++i)
+    {
+        vk::PipelineShaderStageCreateInfo shaderStageInfo;
+        shaderStageInfo.stage = shaderStages[i];
+        shaderStageInfo.module = shaderModules[i];
+        shaderStageInfo.pName = "main";
+
+        shaderPipelineCreateInfo.push_back(shaderStageInfo);
+    }
+
+    // https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
+
+
+
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
 
     // shutdown
     dev.waitIdle();
+
+    for (auto it : swapChainImageViews)
+        dev.destroyImageView(it);
+    swapChainImageViews.clear();
 
     dev.destroySwapchainKHR(swapChain);
 
