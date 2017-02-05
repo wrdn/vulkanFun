@@ -3,8 +3,6 @@
 
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 
-void drawFrame(VKRenderer& r);
-
 int main()
 {
     glfwInit();
@@ -14,24 +12,12 @@ int main()
     GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "vkTest", nullptr, nullptr);
 
     VKRenderer r;
-    r.createInstance();
-    r.setupDebugCallback();
-    r.createSurface(window);
-    r.selectPhysicalDevice();
-    r.selectLogicalDevice();
-    r.createSwapChain();
-    r.createRenderPass();
-    r.loadShaders();
-    r.createPipelineCache();
-    r.createGraphicsPipeline();
-    r.createFrameBuffers();
-    r.createCommandPool();
-    r.createCommandBuffers();
+    r.init(window);
 
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        drawFrame(r);
+        r.drawFrame();
     }
 
     glfwDestroyWindow(window);
@@ -39,8 +25,4 @@ int main()
     r.shutdown();
 
     return 0;
-}
-
-void drawFrame(VKRenderer& r)
-{
 }

@@ -10,6 +10,8 @@ struct GLFWwindow;
 class VKRenderer
 {
 public:
+    void                          init(GLFWwindow* window);
+
     void                          createInstance();
     void                          setupDebugCallback();
     void                          createSurface(GLFWwindow* window);
@@ -24,6 +26,8 @@ public:
     void                          createFrameBuffers();
     void                          createCommandPool();
     void                          createCommandBuffers();
+
+    void                          drawFrame();
 
     void                          shutdown();
 

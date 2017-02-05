@@ -22,6 +22,23 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 };
 
+void VKRenderer::init(GLFWwindow* window)
+{
+    createInstance();
+    setupDebugCallback();
+    createSurface(window);
+    selectPhysicalDevice();
+    selectLogicalDevice();
+    createSwapChain();
+    createRenderPass();
+    loadShaders();
+    createPipelineCache();
+    createGraphicsPipeline();
+    createFrameBuffers();
+    createCommandPool();
+    createCommandBuffers();
+}
+
 void VKRenderer::createInstance()
 {
     auto allInstLayers = vk::enumerateInstanceLayerProperties();
@@ -568,6 +585,10 @@ void VKRenderer::createCommandBuffers()
         cmd.endRenderPass();
         cmd.end();
     }
+}
+
+void VKRenderer::drawFrame()
+{
 }
 
 void VKRenderer::shutdown()
