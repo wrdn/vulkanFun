@@ -22,8 +22,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 };
 
-void VKRenderer::init(GLFWwindow* window)
+void VKRenderer::init(GLFWwindow* window, uint32_t windowWidth, uint32_t windowHeight)
 {
+    m_windowExtents = vk::Extent2D(windowWidth, windowHeight);
+
     createInstance();
     setupDebugCallback();
     createSurface(window);
@@ -228,6 +230,36 @@ void VKRenderer::selectLogicalDevice()
     m_presentQueue = m_dev.getQueue(m_presentQueueIx, 0);
 }
 
+void VKRenderer::recreateSwapChain(uint32_t windowWidth, uint32_t windowHeight)
+{
+    m_dev.waitIdle();
+    
+    m_windowExtents = vk::Extent2D(windowWidth, windowHeight);
+
+    m_dev.freeCommandBuffers(m_commandPool, m_commandBuffers);
+
+    m_dev.destroyPipeline(m_gfxPipeline);
+    m_dev.destroyPipelineLayout(m_gfxPipelineLayout);
+
+    m_dev.destroyRenderPass(m_renderPass);
+
+    for (auto it : m_swapChainFrameBuffers)
+        m_dev.destroyFramebuffer(it);
+    m_swapChainFrameBuffers.clear();
+
+    for (auto it : m_swapChainImageViews)
+        m_dev.destroyImageView(it);
+    m_swapChainImageViews.clear();
+
+    m_dev.destroySwapchainKHR(m_swapChain);
+
+    createSwapChain();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFrameBuffers();
+    createCommandBuffers();
+}
+
 void VKRenderer::createSwapChain()
 {
     auto surfaceCaps = m_physDevice.getSurfaceCapabilitiesKHR(m_surface);
@@ -274,8 +306,8 @@ void VKRenderer::createSwapChain()
     }
     else
     {
-        m_swapExtent.width = WIDTH;
-        m_swapExtent.height = HEIGHT;
+        m_swapExtent.width = m_windowExtents.width;
+        m_swapExtent.height = m_windowExtents.height;
 
         m_swapExtent.width = std::max(surfaceCaps.minImageExtent.width, std::min(surfaceCaps.maxImageExtent.width, m_swapExtent.width));
         m_swapExtent.height = std::max(surfaceCaps.minImageExtent.height, std::min(surfaceCaps.maxImageExtent.height, m_swapExtent.height));
@@ -612,12 +644,21 @@ void VKRenderer::createSemaphores()
 
 void VKRenderer::drawFrame()
 {
-    uint32_t imageIx =
+    auto imageAquireRes =
         m_dev.acquireNextImageKHR(
             m_swapChain,
             std::numeric_limits<uint64_t>::max(),
             m_imageAvailableSemaphore,
-            vk::Fence()).value;
+            vk::Fence());
+
+    if (imageAquireRes.result == vk::Result::eErrorOutOfDateKHR ||
+        imageAquireRes.result == vk::Result::eSuboptimalKHR)
+    {
+        recreateSwapChain(m_windowExtents.width, m_windowExtents.height);
+        return;
+    }
+
+    uint32_t imageIx = imageAquireRes.value;
 
     vk::PipelineStageFlags waitStages[] = {
         vk::PipelineStageFlagBits::eColorAttachmentOutput

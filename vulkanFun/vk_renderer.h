@@ -2,21 +2,19 @@
 
 #include <vulkan/vulkan.hpp>
 
-static const unsigned WIDTH = 640;
-static const unsigned HEIGHT = 480;
-
 struct GLFWwindow;
 
 class VKRenderer
 {
 public:
-    void                          init(GLFWwindow* window);
+    void                          init(GLFWwindow* window, uint32_t windowWidth, uint32_t windowHeight);
 
     void                          createInstance();
     void                          setupDebugCallback();
     void                          createSurface(GLFWwindow* window);
     void                          selectPhysicalDevice();
     void                          selectLogicalDevice();
+    void                          recreateSwapChain(uint32_t windowWidth, uint32_t windowHeight);
     void                          createSwapChain();
     void                          createRenderPass();
     void                          loadShaders();
@@ -51,6 +49,8 @@ private:
     std::vector<vk::Image>        m_swapChainImages;
     std::vector<vk::ImageView>    m_swapChainImageViews;
     std::vector<vk::Framebuffer>  m_swapChainFrameBuffers;
+
+    vk::Extent2D                  m_windowExtents;
 
     vk::RenderPass                m_renderPass;
 
