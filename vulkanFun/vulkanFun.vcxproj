@@ -118,10 +118,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="vk_renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="file_helpers.h" />
     <ClInclude Include="trace.h" />
+    <ClInclude Include="vk_renderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
