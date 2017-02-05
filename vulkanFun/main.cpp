@@ -3,6 +3,8 @@
 
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 
+void drawFrame(VKRenderer& r);
+
 int main()
 {
     glfwInit();
