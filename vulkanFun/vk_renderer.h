@@ -22,6 +22,8 @@ public:
     void                          flushPipelineCache();
     void                          createGraphicsPipeline();
     void                          createFrameBuffers();
+    void                          createCommandPool();
+    void                          createCommandBuffers();
 
     void                          shutdown();
 
@@ -51,6 +53,9 @@ private:
     // test shaders
     vk::ShaderModule              m_vertShader;
     vk::ShaderModule              m_fragShader;
+
+    vk::CommandPool               m_commandPool;
+    std::vector<vk::CommandBuffer> m_commandBuffers;
 
     VkDebugReportCallbackEXT      m_debugCallback;
     std::vector<const char*>      m_validationLayers;

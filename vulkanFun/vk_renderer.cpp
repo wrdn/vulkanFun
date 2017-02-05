@@ -523,11 +523,62 @@ void VKRenderer::createFrameBuffers()
     }
 }
 
+void VKRenderer::createCommandPool()
+{
+    vk::CommandPoolCreateInfo poolInfo;
+    poolInfo.queueFamilyIndex = m_gfxQueueIx;
+
+    m_commandPool = m_dev.createCommandPool(poolInfo);
+}
+
+void VKRenderer::createCommandBuffers()
+{
+    vk::CommandBufferAllocateInfo allocInfo;
+    allocInfo.commandPool = m_commandPool;
+    allocInfo.level = vk::CommandBufferLevel::ePrimary;
+    allocInfo.commandBufferCount = (uint32_t)m_swapChainFrameBuffers.size();
+
+    m_commandBuffers = m_dev.allocateCommandBuffers(allocInfo);
+
+    for (size_t i = 0; i < m_commandBuffers.size(); ++i)
+    {
+        vk::CommandBuffer& cmd = m_commandBuffers[i];
+
+        vk::CommandBufferBeginInfo beginInfo;
+        beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
+        
+        vk::ClearValue clearColour;
+        clearColour.color.float32[0] = 0.0f;
+        clearColour.color.float32[1] = 0.0f;
+        clearColour.color.float32[2] = 0.0f;
+        clearColour.color.float32[3] = 1.0f;
+
+        vk::RenderPassBeginInfo renderPassInfo;
+        renderPassInfo.renderPass = m_renderPass;
+        renderPassInfo.framebuffer = m_swapChainFrameBuffers[i];;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = m_swapExtent;
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColour;
+        
+        cmd.begin(beginInfo);
+        cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_gfxPipeline);
+        cmd.draw(3, 1, 0, 0);
+        cmd.endRenderPass();
+        cmd.end();
+    }
+}
+
 void VKRenderer::shutdown()
 {
     m_dev.waitIdle();
 
     flushPipelineCache();
+
+    m_dev.freeCommandBuffers(m_commandPool, m_commandBuffers);
+
+    m_dev.destroyCommandPool(m_commandPool);
 
     for (auto it : m_swapChainFrameBuffers)
         m_dev.destroyFramebuffer(it);

@@ -23,6 +23,8 @@ int main()
     r.createPipelineCache();
     r.createGraphicsPipeline();
     r.createFrameBuffers();
+    r.createCommandPool();
+    r.createCommandBuffers();
 
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
