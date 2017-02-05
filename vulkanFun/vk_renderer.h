@@ -21,6 +21,7 @@ public:
     void                          createPipelineCache();
     void                          flushPipelineCache();
     void                          createGraphicsPipeline();
+    void                          createFrameBuffers();
 
     void                          shutdown();
 
@@ -39,6 +40,7 @@ private:
     vk::Extent2D                  m_swapExtent;
     std::vector<vk::Image>        m_swapChainImages;
     std::vector<vk::ImageView>    m_swapChainImageViews;
+    std::vector<vk::Framebuffer>  m_swapChainFrameBuffers;
 
     vk::RenderPass                m_renderPass;
 

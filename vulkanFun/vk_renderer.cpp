@@ -506,11 +506,32 @@ void VKRenderer::createGraphicsPipeline()
     m_gfxPipeline = m_dev.createGraphicsPipeline(m_pipelineCache, pipelineInfo);
 }
 
+void VKRenderer::createFrameBuffers()
+{
+    for (auto it : m_swapChainImageViews)
+    {
+        vk::FramebufferCreateInfo framebufferInfo;
+        framebufferInfo.renderPass = m_renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = &it;
+        framebufferInfo.width = m_swapExtent.width;
+        framebufferInfo.height = m_swapExtent.height;
+        framebufferInfo.layers = 1;
+
+        vk::Framebuffer fb = m_dev.createFramebuffer(framebufferInfo);
+        m_swapChainFrameBuffers.push_back(fb);
+    }
+}
+
 void VKRenderer::shutdown()
 {
     m_dev.waitIdle();
 
     flushPipelineCache();
+
+    for (auto it : m_swapChainFrameBuffers)
+        m_dev.destroyFramebuffer(it);
+    m_swapChainFrameBuffers.clear();
 
     m_dev.destroyPipeline(m_gfxPipeline);
     m_dev.destroyPipelineLayout(m_gfxPipelineLayout);
@@ -523,6 +544,7 @@ void VKRenderer::shutdown()
 
     for (auto it : m_swapChainImageViews)
         m_dev.destroyImageView(it);
+    m_swapChainImageViews.clear();
 
     m_dev.destroySwapchainKHR(m_swapChain);
 

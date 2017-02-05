@@ -22,6 +22,7 @@ int main()
     r.loadShaders();
     r.createPipelineCache();
     r.createGraphicsPipeline();
+    r.createFrameBuffers();
 
     while (!glfwWindowShouldClose(window))
         glfwPollEvents();
