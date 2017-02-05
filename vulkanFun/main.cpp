@@ -27,11 +27,18 @@ int main()
     r.createCommandBuffers();
 
     while (!glfwWindowShouldClose(window))
+    {
         glfwPollEvents();
+        drawFrame(r);
+    }
 
     glfwDestroyWindow(window);
 
     r.shutdown();
 
     return 0;
+}
+
+void drawFrame(VKRenderer& r)
+{
 }
