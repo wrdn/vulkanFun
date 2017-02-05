@@ -26,6 +26,7 @@ public:
     void                          createFrameBuffers();
     void                          createCommandPool();
     void                          createCommandBuffers();
+    void                          createSemaphores();
 
     void                          drawFrame();
 
@@ -39,7 +40,10 @@ private:
     vk::Device                    m_dev;
 
     int                           m_gfxQueueIx;
+    vk::Queue                     m_gfxQueue;
+
     int                           m_presentQueueIx;
+    vk::Queue                     m_presentQueue;
 
     vk::SwapchainKHR              m_swapChain;
     vk::Format                    m_swapChainImageFormat;
@@ -60,6 +64,9 @@ private:
 
     vk::CommandPool               m_commandPool;
     std::vector<vk::CommandBuffer> m_commandBuffers;
+
+    vk::Semaphore                 m_imageAvailableSemaphore;
+    vk::Semaphore                 m_renderFinishedSemaphore;
 
     VkDebugReportCallbackEXT      m_debugCallback;
     std::vector<const char*>      m_validationLayers;

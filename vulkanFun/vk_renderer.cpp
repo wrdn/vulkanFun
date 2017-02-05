@@ -37,6 +37,7 @@ void VKRenderer::init(GLFWwindow* window)
     createFrameBuffers();
     createCommandPool();
     createCommandBuffers();
+    createSemaphores();
 }
 
 void VKRenderer::createInstance()
@@ -221,6 +222,10 @@ void VKRenderer::selectLogicalDevice()
 
     // create the logical device now!
     m_dev = m_physDevice.createDevice(deviceCreateInfo);
+
+    // cache queues for later
+    m_gfxQueue = m_dev.getQueue(m_gfxQueueIx, 0);
+    m_presentQueue = m_dev.getQueue(m_presentQueueIx, 0);
 }
 
 void VKRenderer::createSwapChain()
@@ -360,11 +365,23 @@ void VKRenderer::createRenderPass()
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
+    vk::SubpassDependency dependency;
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.srcAccessMask = vk::AccessFlags();
+    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+        vk::AccessFlagBits::eColorAttachmentWrite;
+
     vk::RenderPassCreateInfo renderPassInfo;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
 
     m_renderPass = m_dev.createRenderPass(renderPassInfo);
 }
@@ -587,8 +604,47 @@ void VKRenderer::createCommandBuffers()
     }
 }
 
+void VKRenderer::createSemaphores()
+{
+    m_imageAvailableSemaphore = m_dev.createSemaphore(vk::SemaphoreCreateInfo());
+    m_renderFinishedSemaphore = m_dev.createSemaphore(vk::SemaphoreCreateInfo());
+}
+
 void VKRenderer::drawFrame()
 {
+    uint32_t imageIx =
+        m_dev.acquireNextImageKHR(
+            m_swapChain,
+            std::numeric_limits<uint64_t>::max(),
+            m_imageAvailableSemaphore,
+            vk::Fence()).value;
+
+    vk::PipelineStageFlags waitStages[] = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput
+    };
+
+    vk::SubmitInfo submitInfo;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &m_imageAvailableSemaphore;
+    submitInfo.pWaitDstStageMask = waitStages;
+
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffers[imageIx];
+
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &m_renderFinishedSemaphore;
+
+    m_gfxQueue.submit(submitInfo, vk::Fence());
+
+    vk::PresentInfoKHR presentInfo;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &m_renderFinishedSemaphore;
+
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_swapChain;
+    presentInfo.pImageIndices = &imageIx;
+
+    m_presentQueue.presentKHR(presentInfo);
 }
 
 void VKRenderer::shutdown()
@@ -596,6 +652,9 @@ void VKRenderer::shutdown()
     m_dev.waitIdle();
 
     flushPipelineCache();
+
+    m_dev.destroySemaphore(m_imageAvailableSemaphore);
+    m_dev.destroySemaphore(m_renderFinishedSemaphore);
 
     m_dev.freeCommandBuffers(m_commandPool, m_commandBuffers);
 
