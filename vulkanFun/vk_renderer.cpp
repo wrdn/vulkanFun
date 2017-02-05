@@ -443,6 +443,8 @@ void VKRenderer::createPipelineCache()
     vk::PipelineCacheCreateInfo cacheCreateInfo;
 
     auto pipelineCacheStoredData = file_helpers::readFile("pipeline_cache/cache.bin");
+    //file_helpers::decrypt(pipelineCacheStoredData);
+
     if (pipelineCacheStoredData.empty() == false)
     {
         cacheCreateInfo.initialDataSize = pipelineCacheStoredData.size();
@@ -455,6 +457,7 @@ void VKRenderer::createPipelineCache()
 void VKRenderer::flushPipelineCache()
 {
     auto pipelineCacheData = m_dev.getPipelineCacheData(m_pipelineCache);
+    //file_helpers::encrypt(pipelineCacheData);
     file_helpers::writeFile("pipeline_cache/cache.bin", pipelineCacheData);
 }
 
