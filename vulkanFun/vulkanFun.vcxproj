@@ -74,7 +74,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\include\;C:\VulkanSDK\1.0.39.1\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\include\;C:\VulkanSDK\1.0.39.1\Include\;C:\VulkanSDK\External\glm-0.9.8.4\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.0.39.1\Bin32;C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -123,6 +123,7 @@
   <ItemGroup>
     <ClInclude Include="file_helpers.h" />
     <ClInclude Include="trace.h" />
+    <ClInclude Include="vertex.h" />
     <ClInclude Include="vk_renderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

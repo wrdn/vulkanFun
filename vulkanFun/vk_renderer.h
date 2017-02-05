@@ -22,6 +22,7 @@ public:
     void                          flushPipelineCache();
     void                          createGraphicsPipeline();
     void                          createFrameBuffers();
+    void                          createVertexBuffer();
     void                          createCommandPool();
     void                          createCommandBuffers();
     void                          createSemaphores();
@@ -31,6 +32,8 @@ public:
     void                          shutdown();
 
 private:
+    uint32_t                      findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+
     vk::Instance                  m_inst;
 
     vk::SurfaceKHR                m_surface;
@@ -61,6 +64,9 @@ private:
     // test shaders
     vk::ShaderModule              m_vertShader;
     vk::ShaderModule              m_fragShader;
+
+    vk::Buffer                    m_vertexBuffer;
+    vk::DeviceMemory              m_vertexBufferMemory;
 
     vk::CommandPool               m_commandPool;
     std::vector<vk::CommandBuffer> m_commandBuffers;

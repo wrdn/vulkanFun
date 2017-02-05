@@ -5,6 +5,8 @@
 
 #include <GLFW/glfw3.h>
 
+#include "vertex.h"
+
 static bool ADD_VALIDATION_LAYERS = true;
 static const char* STANDARD_VALIDATION_LAYER_NAME = "VK_LAYER_LUNARG_standard_validation";
 
@@ -37,6 +39,7 @@ void VKRenderer::init(GLFWwindow* window, uint32_t windowWidth, uint32_t windowH
     createPipelineCache();
     createGraphicsPipeline();
     createFrameBuffers();
+    createVertexBuffer();
     createCommandPool();
     createCommandBuffers();
     createSemaphores();
@@ -469,11 +472,15 @@ void VKRenderer::createGraphicsPipeline()
     fragShaderStageInfo.module = m_fragShader;
     fragShaderStageInfo.pName = "main";
 
+
+    auto bindingDesc = Vertex::getBindingDesc();
+    auto attributeDesc = Vertex::getAttributeDesc();
+
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDesc;
+    vertexInputInfo.vertexAttributeDescriptionCount = attributeDesc.size();
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDesc.data();
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly;
     inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
@@ -589,6 +596,53 @@ void VKRenderer::createFrameBuffers()
     }
 }
 
+uint32_t VKRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+{
+    const vk::PhysicalDeviceMemoryProperties memoryProps =
+        m_physDevice.getMemoryProperties();
+
+    for (uint32_t i = 0; i < memoryProps.memoryTypeCount;++i)
+    {
+        const auto& p = memoryProps.memoryTypes[i];
+
+        if (typeFilter & (1 << i) &&
+            (p.propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
+
+void VKRenderer::createVertexBuffer()
+{
+    vk::BufferCreateInfo bufferInfo;
+    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+    bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+    bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+    
+    m_vertexBuffer = m_dev.createBuffer(bufferInfo);
+
+    vk::MemoryRequirements memReq;
+    memReq = m_dev.getBufferMemoryRequirements(m_vertexBuffer);
+
+    vk::MemoryAllocateInfo allocInfo;
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
+        vk::MemoryPropertyFlagBits::eHostVisible |
+        vk::MemoryPropertyFlagBits::eHostCoherent);
+
+    m_vertexBufferMemory = m_dev.allocateMemory(allocInfo);
+
+    m_dev.bindBufferMemory(m_vertexBuffer, m_vertexBufferMemory, 0);
+
+    void* data = m_dev.mapMemory(m_vertexBufferMemory, 0, bufferInfo.size);
+    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+    m_dev.unmapMemory(m_vertexBufferMemory);
+}
+
 void VKRenderer::createCommandPool()
 {
     vk::CommandPoolCreateInfo poolInfo;
@@ -630,7 +684,13 @@ void VKRenderer::createCommandBuffers()
         cmd.begin(beginInfo);
         cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_gfxPipeline);
-        cmd.draw(3, 1, 0, 0);
+
+        vk::ArrayProxy<const vk::Buffer> vertexBuffers = { m_vertexBuffer };
+        vk::ArrayProxy<const vk::DeviceSize> offsets = { 0 };
+        cmd.bindVertexBuffers(0, vertexBuffers, offsets);
+
+        cmd.draw(vertices.size(), 1, 0, 0);
+        
         cmd.endRenderPass();
         cmd.end();
     }
@@ -708,6 +768,9 @@ void VKRenderer::shutdown()
     m_dev.destroyPipeline(m_gfxPipeline);
     m_dev.destroyPipelineLayout(m_gfxPipelineLayout);
     m_dev.destroyPipelineCache(m_pipelineCache);
+
+    m_dev.destroyBuffer(m_vertexBuffer);
+    m_dev.freeMemory(m_vertexBufferMemory);
 
     m_dev.destroyShaderModule(m_vertShader);
     m_dev.destroyShaderModule(m_fragShader);
