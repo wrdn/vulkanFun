@@ -898,3 +898,63 @@ void VKRenderer::shutdown()
     m_dev.destroy();
     m_inst.destroy();
 }
+
+#include <spirv_glsl.hpp>
+void VKRenderer::printDecorations()
+{
+    printDecorations("shaders/vert.spv");
+    printDecorations("shaders/frag.spv");
+}
+
+void VKRenderer::printDecorations(const char* fileName)
+{
+    auto spirvData = file_helpers::readFile(fileName);
+
+    uint32_t* w = (uint32_t*)&spirvData[0];
+    uint32_t len = spirvData.size() / 4;
+
+    std::vector<uint32_t> spirvBytes(len);
+    spirvBytes.assign(w, w + len);
+
+    spirv_cross::CompilerGLSL glsl(std::move(spirvBytes));
+
+    auto printDecorations = [&](const std::vector<spirv_cross::Resource>& v, const char* titleStr) {
+        TRACE("%s:", titleStr);
+        for (auto& it : v)
+        {
+            auto decorationMask = glsl.get_decoration_mask(it.id);
+            for (uint64_t i = 0; i <= spv::DecorationAlignment; ++i) // eugh, no max enum value!
+            {
+                auto decorationType = (spv::Decoration)i;
+                if (decorationMask & (1ull << i))
+                {
+                    auto decorationVal = glsl.get_decoration(it.id, decorationType);
+                    TRACE("Dec %d: %s %d", decorationType, it.name.c_str(), decorationVal);
+                }
+            }
+        }
+    };
+
+
+    char buff[256];
+    sprintf_s(buff, sizeof(buff), "------------ %s ------------", fileName);
+    std::string dashStr(strlen(buff), '-');
+
+    TRACE("%s", dashStr.c_str());
+    TRACE("%s", buff);
+    TRACE("%s", dashStr.c_str());
+
+    auto shaderResources = glsl.get_shader_resources();
+
+    printDecorations(shaderResources.uniform_buffers, "uniform_buffers");
+    printDecorations(shaderResources.storage_buffers, "storage_buffers");
+    printDecorations(shaderResources.stage_inputs, "stage_inputs");
+    printDecorations(shaderResources.stage_outputs, "stage_outputs");
+    printDecorations(shaderResources.subpass_inputs, "subpass_inputs");
+    printDecorations(shaderResources.storage_images, "storage_images");
+    printDecorations(shaderResources.sampled_images, "sampled_images");
+    printDecorations(shaderResources.atomic_counters, "atomic_counters");
+    printDecorations(shaderResources.push_constant_buffers, "push_constant_buffers");
+    printDecorations(shaderResources.separate_images, "separate_images");
+    printDecorations(shaderResources.separate_samplers, "separate_samplers");
+}

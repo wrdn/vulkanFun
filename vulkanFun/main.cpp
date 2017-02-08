@@ -25,6 +25,7 @@ int main()
     
     glfwSetWindowSizeCallback(window, onWindowResized);
 
+    VKRenderer::printDecorations();
     r.init(window, WIDTH, HEIGHT);
 
     while (!glfwWindowShouldClose(window))

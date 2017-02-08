@@ -31,6 +31,9 @@ public:
     void                          drawFrame();
 
     void                          shutdown();
+    
+    static void                   printDecorations();
+    static void                   printDecorations(const char* fileName);
 
 private:
     uint32_t                      findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);

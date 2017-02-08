@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\spirv_cross">
+      <UniqueIdentifier>{daae63aa-fb3f-4a91-898e-0205a2018a79}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -20,6 +23,24 @@
     </ClCompile>
     <ClCompile Include="vk_renderer.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cfg.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cpp.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cross.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_glsl.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_hlsl.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_msl.cpp">
+      <Filter>Header Files\spirv_cross</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -34,6 +55,30 @@
     </ClInclude>
     <ClInclude Include="vertex.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cfg.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_common.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cpp.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cross.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_glsl.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_hlsl.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_msl.hpp">
+      <Filter>Header Files\spirv_cross</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
