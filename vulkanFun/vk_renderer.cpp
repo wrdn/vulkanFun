@@ -2,7 +2,7 @@
 #include "trace.h"
 #include "file_helpers.h"
 #include <set>
-
+#include <chrono>
 #include <GLFW/glfw3.h>
 
 #include "vertex.h"
@@ -39,8 +39,9 @@ void VKRenderer::init(GLFWwindow* window, uint32_t windowWidth, uint32_t windowH
     createPipelineCache();
     createGraphicsPipeline();
     createFrameBuffers();
-    createVertexBuffer();
     createCommandPool();
+    createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSemaphores();
 }
@@ -618,32 +619,129 @@ uint32_t VKRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags
     return 0;
 }
 
-
-void VKRenderer::createVertexBuffer()
+void VKRenderer::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buff, vk::DeviceMemory& buffMemory)
 {
     vk::BufferCreateInfo bufferInfo;
-    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-    bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
     bufferInfo.sharingMode = vk::SharingMode::eExclusive;
-    
-    m_vertexBuffer = m_dev.createBuffer(bufferInfo);
 
-    vk::MemoryRequirements memReq;
-    memReq = m_dev.getBufferMemoryRequirements(m_vertexBuffer);
+    buff = m_dev.createBuffer(bufferInfo);
+
+    vk::MemoryRequirements memReq = m_dev.getBufferMemoryRequirements(buff);
 
     vk::MemoryAllocateInfo allocInfo;
     allocInfo.allocationSize = memReq.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits,
-        vk::MemoryPropertyFlagBits::eHostVisible |
-        vk::MemoryPropertyFlagBits::eHostCoherent);
+    allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, properties);
 
-    m_vertexBufferMemory = m_dev.allocateMemory(allocInfo);
+    buffMemory = m_dev.allocateMemory(allocInfo);
 
-    m_dev.bindBufferMemory(m_vertexBuffer, m_vertexBufferMemory, 0);
+    m_dev.bindBufferMemory(buff, buffMemory, 0);
+}
 
-    void* data = m_dev.mapMemory(m_vertexBufferMemory, 0, bufferInfo.size);
-    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
-    m_dev.unmapMemory(m_vertexBufferMemory);
+void VKRenderer::copyBuffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size)
+{
+    vk::CommandBufferAllocateInfo allocInfo;
+    allocInfo.level = vk::CommandBufferLevel::ePrimary;
+    allocInfo.commandPool = m_commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    auto commandBuffers = m_dev.allocateCommandBuffers(allocInfo);
+    vk::CommandBuffer commandBuffer = commandBuffers[0];
+
+    vk::CommandBufferBeginInfo beginInfo;
+    beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+    commandBuffer.begin(beginInfo);
+
+    vk::BufferCopy copyRegion;
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    commandBuffer.copyBuffer(src, dst, copyRegion);
+
+    commandBuffer.end();
+
+    vk::SubmitInfo submitInfo;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    m_gfxQueue.submit(submitInfo, vk::Fence());
+    m_gfxQueue.waitIdle();
+
+    m_dev.freeCommandBuffers(m_commandPool, commandBuffers);
+}
+
+void VKRenderer::createVertexBuffer()
+{
+    vk::DeviceSize buffSize = sizeof(vertices[0]) * vertices.size();
+    
+    // create staging buffer
+    vk::Buffer stagingBuff;
+    vk::DeviceMemory stagingBuffMem;
+
+    createBuffer(
+        buffSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingBuff,
+        stagingBuffMem);
+
+    // copy vertex data into it
+    void* data = m_dev.mapMemory(stagingBuffMem, 0, buffSize);
+    memcpy(data, vertices.data(), (size_t)buffSize);
+    m_dev.unmapMemory(stagingBuffMem);
+
+    // create device only vertex buffer
+    createBuffer(
+        buffSize,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        m_vertexBuffer,
+        m_vertexBufferMemory);
+
+    // copy from staging to vertex buffer
+    copyBuffer(stagingBuff, m_vertexBuffer, buffSize);
+
+    // and finally destroy the staging buffer, free buffer memory
+    m_dev.destroyBuffer(stagingBuff);
+    m_dev.freeMemory(stagingBuffMem);
+}
+
+void VKRenderer::createIndexBuffer()
+{
+    vk::DeviceSize buffSize = sizeof(indices[0]) * indices.size();
+
+    // create staging buffer
+    vk::Buffer stagingBuff;
+    vk::DeviceMemory stagingBuffMem;
+
+    createBuffer(
+        buffSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingBuff,
+        stagingBuffMem);
+
+    // copy index data into it
+    void* data = m_dev.mapMemory(stagingBuffMem, 0, buffSize);
+    memcpy(data, indices.data(), (size_t)buffSize);
+    m_dev.unmapMemory(stagingBuffMem);
+
+    // create device only vertex buffer
+    createBuffer(
+        buffSize,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        m_indexBuffer,
+        m_indexBufferMemory);
+
+    // copy from staging to index buffer
+    copyBuffer(stagingBuff, m_indexBuffer, buffSize);
+
+    // and finally destroy the staging buffer, free buffer memory
+    m_dev.destroyBuffer(stagingBuff);
+    m_dev.freeMemory(stagingBuffMem);
 }
 
 void VKRenderer::createCommandPool()
@@ -686,14 +784,17 @@ void VKRenderer::createCommandBuffers()
         
         cmd.begin(beginInfo);
         cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_gfxPipeline);
 
         vk::ArrayProxy<const vk::Buffer> vertexBuffers = { m_vertexBuffer };
         vk::ArrayProxy<const vk::DeviceSize> offsets = { 0 };
         cmd.bindVertexBuffers(0, vertexBuffers, offsets);
 
-        cmd.draw(vertices.size(), 1, 0, 0);
-        
+        cmd.bindIndexBuffer(m_indexBuffer, 0, vk::IndexType::eUint16);
+
+        cmd.drawIndexed(indices.size(), 1, 0, 0, 0);
+
         cmd.endRenderPass();
         cmd.end();
     }
@@ -774,6 +875,9 @@ void VKRenderer::shutdown()
 
     m_dev.destroyBuffer(m_vertexBuffer);
     m_dev.freeMemory(m_vertexBufferMemory);
+
+    m_dev.destroyBuffer(m_indexBuffer);
+    m_dev.freeMemory(m_indexBufferMemory);
 
     m_dev.destroyShaderModule(m_vertShader);
     m_dev.destroyShaderModule(m_fragShader);

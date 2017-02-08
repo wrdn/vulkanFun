@@ -23,6 +23,7 @@ public:
     void                          createGraphicsPipeline();
     void                          createFrameBuffers();
     void                          createVertexBuffer();
+    void                          createIndexBuffer();
     void                          createCommandPool();
     void                          createCommandBuffers();
     void                          createSemaphores();
@@ -33,6 +34,8 @@ public:
 
 private:
     uint32_t                      findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+    void                          createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buff, vk::DeviceMemory& buffMemory);
+    void                          copyBuffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
     vk::Instance                  m_inst;
 
@@ -67,6 +70,9 @@ private:
 
     vk::Buffer                    m_vertexBuffer;
     vk::DeviceMemory              m_vertexBufferMemory;
+
+    vk::Buffer                    m_indexBuffer;
+    vk::DeviceMemory              m_indexBufferMemory;
 
     vk::CommandPool               m_commandPool;
     std::vector<vk::CommandBuffer> m_commandBuffers;
