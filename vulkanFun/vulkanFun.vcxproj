@@ -74,7 +74,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\include\;C:\VulkanSDK\1.0.39.1\Include\;C:\VulkanSDK\External\glm-0.9.8.4\glm;C:\VulkanSDK\External\SPIRV-Cross;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\include\;C:\VulkanSDK\1.0.39.1\Include;C:\VulkanSDK\External\glm-0.9.8.4\glm;C:\VulkanSDK\External\SPIRV-Cross;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.0.39.1\Bin32;C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -118,11 +118,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cfg.cpp" />
-    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cpp.cpp" />
     <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cross.cpp" />
     <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_glsl.cpp" />
-    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_hlsl.cpp" />
-    <ClCompile Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_msl.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="vk_renderer.cpp" />
   </ItemGroup>
@@ -130,11 +127,8 @@
     <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv.hpp" />
     <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cfg.hpp" />
     <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_common.hpp" />
-    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cpp.hpp" />
     <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_cross.hpp" />
     <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_glsl.hpp" />
-    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_hlsl.hpp" />
-    <ClInclude Include="..\..\..\..\..\VulkanSDK\External\SPIRV-Cross\spirv_msl.hpp" />
     <ClInclude Include="file_helpers.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="vertex.h" />
