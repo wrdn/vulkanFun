@@ -211,7 +211,7 @@ void VKRenderer::selectLogicalDevice()
     deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
     deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
 
-    vk::PhysicalDeviceFeatures physDeviceFeatures;
+    vk::PhysicalDeviceFeatures physDeviceFeatures = m_physDevice.getFeatures();
     deviceCreateInfo.pEnabledFeatures = &physDeviceFeatures;
 
     // enable the swapchain extension (searched for above)
