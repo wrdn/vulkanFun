@@ -156,6 +156,11 @@ void VKRenderer::selectLogicalDevice()
     // find graphics + present queues
     auto queueFamilies = m_physDevice.getQueueFamilyProperties();
 
+    // print details
+    TRACE("%s queue families:", m_physDevice.getProperties().deviceName);
+    for (int i = 0; i < (int)queueFamilies.size(); ++i)
+        TRACE("Queue %d supports: %s, count=%d", i, vk::to_string(queueFamilies[i].queueFlags).c_str(), queueFamilies[i].queueCount);
+
     m_gfxQueueIx = -1;
     m_presentQueueIx = -1;
 
