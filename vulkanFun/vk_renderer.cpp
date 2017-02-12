@@ -4,6 +4,7 @@
 #include <set>
 #include <chrono>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "vertex.h"
 
@@ -37,11 +38,15 @@ void VKRenderer::init(GLFWwindow* window, uint32_t windowWidth, uint32_t windowH
     createRenderPass();
     loadShaders();
     createPipelineCache();
+    createDescriptorSetLayout();
     createGraphicsPipeline();
     createFrameBuffers();
     createCommandPool();
     createVertexBuffer();
     createIndexBuffer();
+    createUniformBuffer();
+    createDescriptorPool();
+    createDescriptorSet();
     createCommandBuffers();
     createSemaphores();
 }
@@ -467,6 +472,22 @@ void VKRenderer::flushPipelineCache()
     file_helpers::writeFile("pipeline_cache/cache.bin", pipelineCacheData);
 }
 
+void VKRenderer::createDescriptorSetLayout()
+{
+    vk::DescriptorSetLayoutBinding uboLayoutBinding;
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    vk::DescriptorSetLayoutCreateInfo layoutInfo;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    m_descriptorLayout = m_dev.createDescriptorSetLayout(layoutInfo);
+}
+
 void VKRenderer::createGraphicsPipeline()
 {
     vk::PipelineShaderStageCreateInfo shaderStages[2];
@@ -519,7 +540,7 @@ void VKRenderer::createGraphicsPipeline()
     rasterizer.polygonMode = vk::PolygonMode::eFill;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = vk::CullModeFlagBits::eBack;
-    rasterizer.frontFace = vk::FrontFace::eClockwise;
+    rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f; // Optional
     rasterizer.depthBiasClamp = 0.0f; // Optional
@@ -565,8 +586,10 @@ void VKRenderer::createGraphicsPipeline()
     dynamicState.dynamicStateCount = 2;
     dynamicState.pDynamicStates = dynamicsStates;
 
+    vk::DescriptorSetLayout setLayouts[] = { m_descriptorLayout };
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
-    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
 
     m_gfxPipelineLayout = m_dev.createPipelineLayout(pipelineLayoutInfo);
 
@@ -749,6 +772,68 @@ void VKRenderer::createIndexBuffer()
     m_dev.freeMemory(stagingBuffMem);
 }
 
+void VKRenderer::createUniformBuffer()
+{
+    vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    createBuffer(
+        bufferSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCached,
+        m_uniformStagingBuffer,
+        m_uniformStagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        m_uniformBuffer,
+        m_uniformBufferMemory);
+}
+
+void VKRenderer::createDescriptorPool()
+{
+    vk::DescriptorPoolSize poolSize;
+    poolSize.type = vk::DescriptorType::eUniformBuffer;
+    poolSize.descriptorCount = 1;
+    
+    vk::DescriptorPoolCreateInfo poolCreateInfo;
+    poolCreateInfo.poolSizeCount = 1;
+    poolCreateInfo.pPoolSizes = &poolSize;
+    poolCreateInfo.maxSets = 1;
+
+    m_descriptorPool = m_dev.createDescriptorPool(poolCreateInfo);
+}
+
+void VKRenderer::createDescriptorSet()
+{
+    vk::DescriptorSetLayout layouts[] = { m_descriptorLayout };
+
+    vk::DescriptorSetAllocateInfo allocInfo;
+    allocInfo.descriptorPool = m_descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    m_descriptorSet = m_dev.allocateDescriptorSets(allocInfo)[0];
+
+    vk::DescriptorBufferInfo bufferInfo;
+    bufferInfo.buffer = m_uniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    vk::WriteDescriptorSet descriptorWrite;
+    descriptorWrite.dstSet = m_descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr;
+    descriptorWrite.pTexelBufferView = nullptr;
+
+    m_dev.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
+}
+
 void VKRenderer::createCommandPool()
 {
     vk::CommandPoolCreateInfo poolInfo;
@@ -794,8 +879,13 @@ void VKRenderer::createCommandBuffers()
 
         vk::ArrayProxy<const vk::Buffer> vertexBuffers = { m_vertexBuffer };
         vk::ArrayProxy<const vk::DeviceSize> offsets = { 0 };
-        cmd.bindVertexBuffers(0, vertexBuffers, offsets);
+        
+        vk::ArrayProxy<const vk::DescriptorSet> descriptorSets({ m_descriptorSet });
+        vk::ArrayProxy<const uint32_t> temp({ 0 });
 
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_gfxPipelineLayout, 0, descriptorSets, temp);
+
+        cmd.bindVertexBuffers(0, vertexBuffers, offsets);
         cmd.bindIndexBuffer(m_indexBuffer, 0, vk::IndexType::eUint16);
 
         cmd.drawIndexed(indices.size(), 1, 0, 0, 0);
@@ -857,6 +947,26 @@ void VKRenderer::drawFrame()
     m_presentQueue.presentKHR(presentInfo);
 }
 
+void VKRenderer::updateFrame()
+{
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+    UniformBufferObject ubo;
+    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), (float)m_swapExtent.width / (float)m_swapExtent.height, 0.1f, 10.0f);
+    ubo.proj[1][1] *= -1;
+
+    void* data = m_dev.mapMemory(m_uniformStagingBufferMemory, 0, sizeof(ubo), vk::MemoryMapFlags());
+    memcpy(data, &ubo, sizeof(ubo));
+    m_dev.unmapMemory(m_uniformStagingBufferMemory);
+
+    copyBuffer(m_uniformStagingBuffer, m_uniformBuffer, sizeof(ubo));
+}
+
 void VKRenderer::shutdown()
 {
     m_dev.waitIdle();
@@ -878,11 +988,20 @@ void VKRenderer::shutdown()
     m_dev.destroyPipelineLayout(m_gfxPipelineLayout);
     m_dev.destroyPipelineCache(m_pipelineCache);
 
+    m_dev.destroyDescriptorSetLayout(m_descriptorLayout);
+    m_dev.destroyDescriptorPool(m_descriptorPool);
+
     m_dev.destroyBuffer(m_vertexBuffer);
     m_dev.freeMemory(m_vertexBufferMemory);
 
     m_dev.destroyBuffer(m_indexBuffer);
     m_dev.freeMemory(m_indexBufferMemory);
+
+    m_dev.destroyBuffer(m_uniformBuffer);
+    m_dev.freeMemory(m_uniformBufferMemory);
+
+    m_dev.destroyBuffer(m_uniformStagingBuffer);
+    m_dev.freeMemory(m_uniformStagingBufferMemory);
 
     m_dev.destroyShaderModule(m_vertShader);
     m_dev.destroyShaderModule(m_fragShader);
@@ -923,6 +1042,56 @@ void VKRenderer::printDecorations(const char* fileName)
 
     spirv_cross::CompilerGLSL glsl(std::move(spirvBytes));
 
+    auto decorationTypeToString = [](spv::Decoration d) {
+        switch (d)
+        {
+        case spv::Decoration::DecorationRelaxedPrecision: return "DecorationRelaxedPrecision";
+        case spv::Decoration::DecorationSpecId: return "DecorationSpecId";
+        case spv::Decoration::DecorationBlock: return "DecorationBlock";
+        case spv::Decoration::DecorationBufferBlock: return "DecorationBufferBlock";
+        case spv::Decoration::DecorationRowMajor: return "DecorationRowMajor";
+        case spv::Decoration::DecorationColMajor: return "DecorationColMajor";
+        case spv::Decoration::DecorationArrayStride: return "DecorationArrayStride";
+        case spv::Decoration::DecorationMatrixStride: return "DecorationMatrixStride";
+        case spv::Decoration::DecorationGLSLShared: return "DecorationGLSLShared";
+        case spv::Decoration::DecorationGLSLPacked: return "DecorationGLSLPacked";
+        case spv::Decoration::DecorationCPacked: return "DecorationCPacked";
+        case spv::Decoration::DecorationBuiltIn: return "DecorationBuiltIn";
+        case spv::Decoration::DecorationNoPerspective: return "DecorationNoPerspective";
+        case spv::Decoration::DecorationFlat: return "DecorationFlat";
+        case spv::Decoration::DecorationPatch: return "DecorationPatch";
+        case spv::Decoration::DecorationCentroid: return "DecorationCentroid";
+        case spv::Decoration::DecorationSample: return "DecorationSample";
+        case spv::Decoration::DecorationInvariant: return "DecorationInvariant";
+        case spv::Decoration::DecorationRestrict: return "DecorationRestrict";
+        case spv::Decoration::DecorationAliased: return "DecorationAliased";
+        case spv::Decoration::DecorationVolatile: return "DecorationVolatile";
+        case spv::Decoration::DecorationConstant: return "DecorationConstant";
+        case spv::Decoration::DecorationCoherent: return "DecorationCoherent";
+        case spv::Decoration::DecorationNonWritable: return "DecorationNonWritable";
+        case spv::Decoration::DecorationNonReadable: return "DecorationNonReadable";
+        case spv::Decoration::DecorationUniform: return "DecorationUniform";
+        case spv::Decoration::DecorationSaturatedConversion: return "DecorationSaturatedConversion";
+        case spv::Decoration::DecorationStream: return "DecorationStream";
+        case spv::Decoration::DecorationLocation: return "DecorationLocation";
+        case spv::Decoration::DecorationComponent: return "DecorationComponent";
+        case spv::Decoration::DecorationIndex: return "DecorationIndex";
+        case spv::Decoration::DecorationBinding: return "DecorationBinding";
+        case spv::Decoration::DecorationDescriptorSet: return "DecorationDescriptorSet";
+        case spv::Decoration::DecorationOffset: return "DecorationOffset";
+        case spv::Decoration::DecorationXfbBuffer: return "DecorationXfbBuffer";
+        case spv::Decoration::DecorationXfbStride: return "DecorationXfbStride";
+        case spv::Decoration::DecorationFuncParamAttr: return "DecorationFuncParamAttr";
+        case spv::Decoration::DecorationFPRoundingMode: return "DecorationFPRoundingMode";
+        case spv::Decoration::DecorationFPFastMathMode: return "DecorationFPFastMathMode";
+        case spv::Decoration::DecorationLinkageAttributes: return "DecorationLinkageAttributes";
+        case spv::Decoration::DecorationNoContraction: return "DecorationNoContraction";
+        case spv::Decoration::DecorationInputAttachmentIndex: return "DecorationInputAttachmentIndex";
+        case spv::Decoration::DecorationAlignment: return "DecorationAlignment";
+        };
+        return "unknown";
+    };
+
     auto printDecorations = [&](const std::vector<spirv_cross::Resource>& v, const char* titleStr) {
         TRACE("%s:", titleStr);
         for (auto& it : v)
@@ -934,7 +1103,7 @@ void VKRenderer::printDecorations(const char* fileName)
                 if (decorationMask & (1ull << i))
                 {
                     auto decorationVal = glsl.get_decoration(it.id, decorationType);
-                    TRACE("Dec %d: %s %d", decorationType, it.name.c_str(), decorationVal);
+                    TRACE("%s: %s %d", decorationTypeToString(decorationType), it.name.c_str(), decorationVal);
                 }
             }
         }

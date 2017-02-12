@@ -31,6 +31,7 @@ int main()
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
+        r.updateFrame();
         r.drawFrame();
     }
 

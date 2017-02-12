@@ -2,7 +2,16 @@
 
 #include <vulkan/vulkan.hpp>
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+
 struct GLFWwindow;
+
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
 
 class VKRenderer
 {
@@ -20,15 +29,20 @@ public:
     void                          loadShaders();
     void                          createPipelineCache();
     void                          flushPipelineCache();
+    void                          createDescriptorSetLayout();
     void                          createGraphicsPipeline();
     void                          createFrameBuffers();
     void                          createVertexBuffer();
     void                          createIndexBuffer();
+    void                          createUniformBuffer();
+    void                          createDescriptorPool();
+    void                          createDescriptorSet();
     void                          createCommandPool();
     void                          createCommandBuffers();
     void                          createSemaphores();
 
     void                          drawFrame();
+    void                          updateFrame();
 
     void                          shutdown();
     
@@ -63,6 +77,10 @@ private:
 
     vk::RenderPass                m_renderPass;
 
+    vk::DescriptorSetLayout       m_descriptorLayout;
+    vk::DescriptorPool            m_descriptorPool;
+    vk::DescriptorSet             m_descriptorSet;
+
     vk::Pipeline                  m_gfxPipeline;
     vk::PipelineLayout            m_gfxPipelineLayout;
     vk::PipelineCache             m_pipelineCache;
@@ -76,6 +94,11 @@ private:
 
     vk::Buffer                    m_indexBuffer;
     vk::DeviceMemory              m_indexBufferMemory;
+
+    vk::Buffer                    m_uniformStagingBuffer;
+    vk::DeviceMemory              m_uniformStagingBufferMemory;
+    vk::Buffer                    m_uniformBuffer;
+    vk::DeviceMemory              m_uniformBufferMemory;
 
     vk::CommandPool               m_commandPool;
     std::vector<vk::CommandBuffer> m_commandBuffers;
