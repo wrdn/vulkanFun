@@ -9,7 +9,7 @@
 #include "vertex.h"
 
 static bool ADD_VALIDATION_LAYERS = true;
-static bool ADD_RENDERDOC_LAYER = true;
+static bool ADD_RENDERDOC_LAYER = false;
 static const char* STANDARD_VALIDATION_LAYER_NAME = "VK_LAYER_LUNARG_standard_validation";
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
