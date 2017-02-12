@@ -1118,7 +1118,7 @@ void VKRenderer::printDecorations(const char* fileName)
                 if (decorationMask & (1ull << i))
                 {
                     auto decorationVal = glsl.get_decoration(it.id, decorationType);
-                    TRACE("%s: %s %d", decorationTypeToString(decorationType), it.name.c_str(), decorationVal);
+                    TRACE(">> %s: %s %d", decorationTypeToString(decorationType), it.name.c_str(), decorationVal);
                 }
             }
         }
