@@ -9,6 +9,7 @@
 #include "vertex.h"
 
 static bool ADD_VALIDATION_LAYERS = true;
+static bool ADD_RENDERDOC_LAYER = true;
 static const char* STANDARD_VALIDATION_LAYER_NAME = "VK_LAYER_LUNARG_standard_validation";
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -64,9 +65,9 @@ void VKRenderer::createInstance()
     for (auto it : allInstLayers)
         TRACE("> %s", it.layerName);
 
-    m_validationLayers.clear();
+    m_addStandardValidationLayer = false;
 
-    // Add VK_LAYER_LUNARG_standard_validation if it exists in extension list
+    // Add VK_LAYER_LUNARG_standard_validation and VK_LAYER_RENDERDOC_Capture if they exists in extension list,
     // and validation layers are turned on
     std::vector<const char*> instLayers;
     if (ADD_VALIDATION_LAYERS)
@@ -74,11 +75,23 @@ void VKRenderer::createInstance()
         auto validationLayer = std::find_if(allInstLayers.begin(), allInstLayers.end(), [](const vk::LayerProperties& e) {
             return strcmp(e.layerName, STANDARD_VALIDATION_LAYER_NAME) == 0;
         });
-
+        
         if (validationLayer != allInstLayers.end())
         {
             instLayers.push_back(validationLayer->layerName);
-            m_validationLayers.push_back(validationLayer->layerName);
+            m_addStandardValidationLayer = true;
+        }
+    }
+
+    if (ADD_RENDERDOC_LAYER)
+    {
+        auto renderDocLayer = std::find_if(allInstLayers.begin(), allInstLayers.end(), [](const vk::LayerProperties& e) {
+            return strcmp(e.layerName, "VK_LAYER_RENDERDOC_Capture") == 0;
+        });
+
+        if (renderDocLayer != allInstLayers.end())
+        {
+            instLayers.push_back(renderDocLayer->layerName);
         }
     }
 
@@ -229,11 +242,13 @@ void VKRenderer::selectLogicalDevice()
     deviceCreateInfo.enabledExtensionCount = 1;
     deviceCreateInfo.ppEnabledExtensionNames = swapchainExtId;
 
+    const char* standardValidationLayers[] = { STANDARD_VALIDATION_LAYER_NAME };
+
     // and validation layers
-    if (ADD_VALIDATION_LAYERS)
+    if (ADD_VALIDATION_LAYERS && m_addStandardValidationLayer)
     {
-        deviceCreateInfo.enabledLayerCount = (uint32_t)m_validationLayers.size();
-        deviceCreateInfo.ppEnabledLayerNames = m_validationLayers.data();
+        deviceCreateInfo.enabledLayerCount = 1;
+        deviceCreateInfo.ppEnabledLayerNames = standardValidationLayers;
     }
 
     // create the logical device now!

@@ -107,5 +107,5 @@ private:
     vk::Semaphore                 m_renderFinishedSemaphore;
 
     VkDebugReportCallbackEXT      m_debugCallback;
-    std::vector<const char*>      m_validationLayers;
+    bool                          m_addStandardValidationLayer;
 };
