@@ -75,6 +75,8 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\include\;C:\VulkanSDK\1.0.39.1\Include;C:\VulkanSDK\External\glm-0.9.8.4\glm;C:\VulkanSDK\External\SPIRV-Cross;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.0.39.1\Bin32;C:\VulkanSDK\External\glfw-3.2.1.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
