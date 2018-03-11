@@ -57,11 +57,11 @@ void VKRenderer::createInstance()
     auto allInstLayers = vk::enumerateInstanceLayerProperties();
     auto allInstExtensions = vk::enumerateInstanceExtensionProperties();
 
-    TRACE("Available Instance Extensions:");
+    TRACE("%s", "Available Instance Extensions:");
     for (auto it : allInstExtensions)
         TRACE("> %s", it.extensionName);
 
-    TRACE("Available Instance Layers:");
+    TRACE("%s", "Available Instance Layers:");
     for (auto it : allInstLayers)
         TRACE("> %s", it.layerName);
 
@@ -141,7 +141,8 @@ void VKRenderer::setupDebugCallback()
 
     auto createDebugReportFunc = (PFN_vkCreateDebugReportCallbackEXT)m_inst.getProcAddr("vkCreateDebugReportCallbackEXT");
 
-    auto debugReportCallbackRes = createDebugReportFunc(VkInstance(m_inst), &VkDebugReportCallbackCreateInfoEXT(debugReportCallbackInfo), nullptr, &m_debugCallback);
+	auto debugReportCreateInfEXT = VkDebugReportCallbackCreateInfoEXT(debugReportCallbackInfo);
+    auto debugReportCallbackRes = createDebugReportFunc(VkInstance(m_inst), &debugReportCreateInfEXT, nullptr, &m_debugCallback);
 }
 
 void VKRenderer::createSurface(GLFWwindow* window)
@@ -540,7 +541,7 @@ void VKRenderer::createGraphicsPipeline()
     viewport.maxDepth = 1.0f;
 
     vk::Rect2D scissor;
-    scissor.offset = { 0, 0 };
+    scissor.offset = vk::Offset2D(0, 0);
     scissor.extent = m_swapExtent;
 
     vk::PipelineViewportStateCreateInfo viewportState;
@@ -882,7 +883,7 @@ void VKRenderer::createCommandBuffers()
         vk::RenderPassBeginInfo renderPassInfo;
         renderPassInfo.renderPass = m_renderPass;
         renderPassInfo.framebuffer = m_swapChainFrameBuffers[i];;
-        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.offset = vk::Offset2D(0, 0);
         renderPassInfo.renderArea.extent = m_swapExtent;
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColour;
@@ -1038,7 +1039,7 @@ void VKRenderer::shutdown()
     m_inst.destroy();
 }
 
-#include <spirv_glsl.hpp>
+#include <spirv_cross/spirv_glsl.hpp>
 void VKRenderer::printDecorations()
 {
     printDecorations("shaders/vert.spv");
@@ -1125,13 +1126,7 @@ void VKRenderer::printDecorations(const char* fileName)
     };
 
 
-    char buff[256];
-    sprintf_s(buff, sizeof(buff), "------------ %s ------------", fileName);
-    std::string dashStr(strlen(buff), '-');
-
-    TRACE("%s", dashStr.c_str());
-    TRACE("%s", buff);
-    TRACE("%s", dashStr.c_str());
+    TRACE("------------ %s ------------", fileName);
 
     auto shaderResources = glsl.get_shader_resources();
 
